@@ -3,24 +3,23 @@ import PyPDF2  # Instalar previamente con pip install PyPDF2
 import glob
 import os
 import shutil  # Para mover los archivos
+import pytesseract  # Instalar previamente con pip install pytesseract
+from pdf2image import convert_from_path  # Instalar previamente con pip install pdf2image
+from pathlib import Path
 
 # 1. Automatización Lectura Ficheros Excel (Ventas)
-# Define la ruta relativa a los archivos de entrada
-ruta_excel = './Inputs/Ventas_productos_automóvil.xlsx'
-df_ventas = pd.read_excel(ruta_excel)
+# Cambié la ruta para que sea relativa. Asegúrate de tener el archivo Excel en el mismo directorio que el script o en una subcarpeta.
+df_ventas = pd.read_excel(os.path.join(os.getcwd(), 'Inputs', 'Ventas_productos_automóvil.xlsx'))
 
 # Ver las primeras filas del DataFrame
 print(df_ventas.head())
 
 # 2. Automatización Lectura Ficheros PDF (Facturas)
-# Define la ruta relativa para los ficheros PDF
-ruta_pdfs = './Inputs/*.pdf'
-
 # Obtener lista de ficheros PDF en el directorio 'Inputs'
-lista_ficheros_pdf = glob.glob(ruta_pdfs)
+lista_ficheros_pdf = glob.glob(os.path.join(os.getcwd(), 'Inputs', '*.pdf'))
 
-# Crear la ruta de destino (si no existe, se crea)
-ruta_destino = './orden'
+# Crear la ruta de destino (si no existe, se crea) de forma relativa
+ruta_destino = os.path.join(os.getcwd(), 'orden')
 if not os.path.exists(ruta_destino):
     os.makedirs(ruta_destino)
 
@@ -34,10 +33,24 @@ for fichero_pdf in lista_ficheros_pdf:
         # Obtener número de páginas del PDF
         print(f"\nNúmero de páginas del PDF '{fichero_pdf}': {len(lector.pages)}")
 
-        # Extraer texto de la primera página
+        # Intentar extraer texto de la primera página (si es texto accesible)
         pag = lector.pages[0]
         texto = pag.extract_text()
-        print(f"Texto extraído de la primera página:\n{texto}")
+        
+        if texto:
+            print(f"Texto extraído de la primera página:\n{texto}")
+        else:
+            print("No se pudo extraer texto directamente del PDF. Procediendo con OCR...")
+
+            # Convertir la página PDF en imagen
+            images = convert_from_path(fichero_pdf)
+            for i, image in enumerate(images):
+                # Utilizar pytesseract para hacer OCR en la imagen
+                texto_imagen = pytesseract.image_to_string(image)
+                print(f"Texto extraído de la imagen (Página {i + 1}):\n{texto_imagen}")
+
+                # Concatenar el texto extraído de las imágenes
+                texto = texto + texto_imagen
 
         # Identificar donde está el primer salto de línea para obtener el nombre del proveedor
         indice_final = texto.find('\n')
@@ -72,3 +85,4 @@ for fichero_pdf in lista_ficheros_pdf:
             print(f"Archivo original '{fichero_pdf}' eliminado.")
         except Exception as e:
             print(f"Error al eliminar el archivo original '{fichero_pdf}': {e}")
+
